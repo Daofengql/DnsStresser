@@ -12,14 +12,11 @@ jobs:
     strategy:
       matrix:
         os: [linux, windows, darwin]
-        arch: [amd64, arm64, 386, arm64, armv7, armv9]
+        arch: [amd64, 386, arm64, armv9]
         exclude:
           # 排除 darwin/386
           - os: darwin
             arch: 386
-          # 排除 windows/armv7 和 windows/armv9
-          - os: windows
-            arch: armv7
           - os: windows
             arch: armv9
 
