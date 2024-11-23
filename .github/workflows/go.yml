@@ -34,6 +34,7 @@ jobs:
         if [ "${{ matrix.os }}" == "windows" ]; then
           OUTPUT_NAME+=".exe"
         fi
+        echo "$OUTPUT_NAME"
         mkdir -p build
         go build -o build/$OUTPUT_NAME ./...
     - name: Upload Build Artifact
