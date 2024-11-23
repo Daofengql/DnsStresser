@@ -37,8 +37,8 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         echo "Building for $GOOS/$GOARCH"
-        OUTPUT_NAME="${{ matrix.os }}-${{ matrix.arch }}"
-        if [ "$GOOS" = "windows" ]; then
+        OUTPUT_NAME="myapp"
+        if [ "$GOOS" == "windows" ]; then
           OUTPUT_NAME+=".exe"
         fi
         mkdir -p build
@@ -75,7 +75,6 @@ jobs:
 
     - name: Prepare Release Assets
       run: |
-        ls artifacts/
         mkdir -p release_assets
         for dir in artifacts/*; do
           if [ -f "$dir" ]; then
