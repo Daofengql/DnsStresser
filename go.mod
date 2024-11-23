@@ -1,6 +1,6 @@
 module DNS_Stresser
 
-go 1.23.2
+go 1.23
 
 require github.com/miekg/dns v1.1.62
 
