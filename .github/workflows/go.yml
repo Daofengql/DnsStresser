@@ -5,6 +5,8 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
+  tags:
+    - "v*.*.*"  # 针对版本标签发布
 
 permissions:
   contents: write   # 必须的权限，用于创建发布
@@ -53,7 +55,7 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'  # 仅在 push 事件触发时运行
+    if: github.event_name == 'push' || github.event_name == 'push_tag' # 仅在 push 或 tag 触发时运行
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -63,19 +65,23 @@ jobs:
       with:
         path: artifacts/
 
-    - name: Get Commit Info
-      id: get_commit
+    - name: Parse Version Tag
+      id: vars
       run: |
-        echo "commit_msg=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
-        echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
-    - name: Generate Version Tag
-      id: generate_tag
-      run: echo "tag=v${{ github.run_number }}" >> $GITHUB_ENV
+        echo "Parsing version tag..."
+        TAG=${GITHUB_REF/refs\/tags\//}
+        SEMVER_RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z\.-]*\)'
+        TAG_MAJOR=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\1#")
+        TAG_MINOR=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\2#")
+        TAG_PATCH=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\3#")
+        TAG_SPECIAL=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\4#")
+        echo "tag_major=${TAG_MAJOR}" >> $GITHUB_ENV
+        echo "tag_minor=${TAG_MINOR}" >> $GITHUB_ENV
+        echo "tag_patch=${TAG_PATCH}" >> $GITHUB_ENV
+        echo "tag_special=${TAG_SPECIAL}" >> $GITHUB_ENV
 
     - name: Prepare Release Assets
       run: |
-        ls artifacts/
         mkdir -p release_assets
         for dir in artifacts/*; do
           if [ -d "$dir" ]; then
@@ -88,13 +94,15 @@ jobs:
       uses: ncipollo/release-action@v1
       with:
         artifacts: "release_assets/**"
-        tag: ${{ env.tag }}
-        releaseName: "Release ${{ env.tag }}"
+        tag: ${{ github.ref_name || 'v1.0.0' }}
+        releaseName: "Release ${{ github.ref_name || 'v1.0.0' }}"
         body: |
-          Commit: ${{ env.commit_sha }}
-          Changes:
-          ${{ env.commit_msg }}
+          Version: ${{ github.ref_name }}
+          Major: ${{ env.tag_major }}
+          Minor: ${{ env.tag_minor }}
+          Patch: ${{ env.tag_patch }}
+          Special: ${{ env.tag_special }}
         draft: false
-        prerelease: false
+        prerelease: ${{ env.tag_special != '' }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
