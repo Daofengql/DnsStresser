@@ -4,12 +4,12 @@ on:
   push:
     branches: [ "master" ]
     tags:
-      - "v*.*.*"  # 针对版本标签发布
+      - "v*.*.*"  # For version tag releases
   pull_request:
     branches: [ "master" ]
 
 permissions:
-  contents: write   # 必须的权限，用于创建发布
+  contents: write   # Required to create releases
 
 jobs:
   build:
@@ -49,13 +49,13 @@ jobs:
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.os }}-${{ matrix.arch }}
+        name: binaries
         path: build/$OUTPUT_NAME
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # 仅在 push 或手动触发时运行
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # Only run on push or manual trigger
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -64,6 +64,11 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         path: release_assets/
+
+    - name: List Release Assets Directory
+      run: |
+        echo "Contents of release_assets/:"
+        ls -al release_assets/
 
     - name: Parse Version Tag
       id: vars
