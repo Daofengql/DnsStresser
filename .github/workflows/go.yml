@@ -47,9 +47,10 @@ jobs:
         go build -o build/$OUTPUT_NAME ./...
 
     - name: Upload Build Artifact
+      if: always()
       uses: actions/upload-artifact@v3
       with:
-        name: binaries
+        name: "${{ matrix.os }}-${{ matrix.arch }}"
         path: build/$OUTPUT_NAME
 
   release:
@@ -95,7 +96,7 @@ jobs:
     - name: Prepare Release Assets
       run: |
         mkdir -p release_assets_flat
-        find release_assets/ -type f -exec cp {} release_assets_flat/ \;
+        cp release_assets/*/* release_assets_flat/
 
     - name: Upload to GitHub Release
       uses: ncipollo/release-action@v1
