@@ -30,7 +30,7 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         echo "Building for $GOOS/$GOARCH"
-        OUTPUT_NAME="myapp"
+        OUTPUT_NAME="${{ matrix.os }}-${{ matrix.arch }}"
         if [ "${{ matrix.os }}" == "windows" ]; then
           OUTPUT_NAME+=".exe"
         fi
