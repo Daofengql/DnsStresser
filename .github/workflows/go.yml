@@ -7,9 +7,8 @@ on:
     branches: [ "master" ]
 
 permissions:
-  contents: write   # 授予内容的写权限，必要的，用于创建发布
+  contents: write   # 必须的权限，用于创建发布
 
-  
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,6 +16,13 @@ jobs:
       matrix:
         os: [linux, windows, darwin]
         arch: [amd64, arm64]
+        exclude:
+          - os: darwin
+            arch: 386
+          - os: windows
+            arch: armv7
+          - os: windows
+            arch: armv9
     steps:
     - uses: actions/checkout@v4
 
@@ -31,14 +37,31 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         echo "Building for $GOOS/$GOARCH"
-        mkdir -p build/$GOOS-$GOARCH
-        go build -o build/$GOOS-$GOARCH/main ./...
+        OUTPUT_NAME="myapp"
+        if [ "${{ matrix.os }}" == "windows" ]; then
+          OUTPUT_NAME+=".exe"
+        fi
+        mkdir -p build
+        go build -o build/$OUTPUT_NAME ./...
 
-    - name: Collect Build Artifacts
-      run: |
-        mkdir -p artifacts
-        cp -r build/* artifacts/
-      shell: bash
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.os }}-${{ matrix.arch }}
+        path: build/
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'  # 仅在 push 事件触发时运行
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download Build Artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts/
 
     - name: Get Commit Info
       id: get_commit
@@ -50,11 +73,21 @@ jobs:
       id: generate_tag
       run: echo "tag=v${{ github.run_number }}" >> $GITHUB_ENV
 
+    - name: Prepare Release Assets
+      run: |
+        ls artifacts/
+        mkdir -p release_assets
+        for dir in artifacts/*; do
+          if [ -d "$dir" ]; then
+            PLATFORM=$(basename "$dir")
+            cp "$dir"/* "release_assets/${PLATFORM}"
+          fi
+        done
+
     - name: Upload to GitHub Release
-      if: ${{ matrix.os == 'linux' && matrix.arch == 'amd64' }}
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "artifacts/**/*"
+        artifacts: "release_assets/**"
         tag: ${{ env.tag }}
         releaseName: "Release ${{ env.tag }}"
         body: |
