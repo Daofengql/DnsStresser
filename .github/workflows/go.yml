@@ -7,7 +7,7 @@ on:
     branches: [ "master" ]
 
 permissions:
-  contents: write   # 必须的权限，用于创建发布
+  contents: write   # 授予内容的写权限，必要的，用于创建发布
 
 jobs:
   build:
@@ -30,56 +30,32 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         echo "Building for $GOOS/$GOARCH"
-        OUTPUT_NAME="myapp"
-        if [ "$GOOS" == "windows" ]; then
-          OUTPUT_NAME+=".exe"
+        OUTPUT_NAME="main"
+        if [ "$GOOS" = "windows" ]; then
+          OUTPUT_NAME="main.exe"
         fi
-        mkdir -p build
-        go build -o build/$OUTPUT_NAME ./...
-
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: ${{ matrix.os }}-${{ matrix.arch }}
-        path: build/$OUTPUT_NAME
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'  # 仅在 push 事件触发时运行
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Download Build Artifacts
-      uses: actions/download-artifact@v3
-      with:
-        path: artifacts/
+        mkdir -p build/$GOOS-$GOARCH
+        go build -o build/$GOOS-$GOARCH/$OUTPUT_NAME ./...
+    - name: Collect Build Artifacts
+      run: |
+        mkdir -p artifacts
+        cp -r build/* artifacts/
+      shell: bash
 
     - name: Get Commit Info
       id: get_commit
       run: |
         echo "commit_msg=$(git log -1 --pretty=%B)" >> $GITHUB_ENV
         echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
     - name: Generate Version Tag
       id: generate_tag
       run: echo "tag=v${{ github.run_number }}" >> $GITHUB_ENV
 
-    - name: Prepare Release Assets
-      run: |
-        mkdir -p release_assets
-        for dir in artifacts/*; do
-          if [ -f "$dir" ]; then
-            PLATFORM=$(basename "$dir")
-            cp "$dir" "release_assets/${PLATFORM}"
-          fi
-        done
-
     - name: Upload to GitHub Release
+      if: ${{ matrix.os == 'linux' && matrix.arch == 'amd64' }}
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "release_assets/*"
+        artifacts: "artifacts/**/*"
         tag: ${{ env.tag }}
         releaseName: "Release ${{ env.tag }}"
         body: |
