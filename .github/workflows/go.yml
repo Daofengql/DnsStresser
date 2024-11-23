@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "master" ]
 
+permissions:
+  contents: write   # 授予内容的写权限，必要的，用于创建发布
+
+  
 jobs:
   build:
     runs-on: ubuntu-latest
