@@ -3,10 +3,10 @@ name: Go Cross-Platform Build and Release
 on:
   push:
     branches: [ "master" ]
+    tags:
+      - "v*.*.*"  # 针对版本标签发布
   pull_request:
     branches: [ "master" ]
-  tags:
-    - "v*.*.*"  # 针对版本标签发布
 
 permissions:
   contents: write   # 必须的权限，用于创建发布
@@ -39,8 +39,8 @@ jobs:
         GOARCH: ${{ matrix.arch }}
       run: |
         echo "Building for $GOOS/$GOARCH"
-        OUTPUT_NAME="myapp"
-        if [ "${{ matrix.os }}" == "windows" ]; then
+        OUTPUT_NAME="${{ matrix.os }}-${{ matrix.arch }}"
+        if [ "$GOOS" = "windows" ]; then
           OUTPUT_NAME+=".exe"
         fi
         mkdir -p build
@@ -50,12 +50,12 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: ${{ matrix.os }}-${{ matrix.arch }}
-        path: build/
+        path: build/$OUTPUT_NAME
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'push_tag' # 仅在 push 或 tag 触发时运行
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # 仅在 push 或手动触发时运行
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -63,37 +63,39 @@ jobs:
     - name: Download Build Artifacts
       uses: actions/download-artifact@v3
       with:
-        path: artifacts/
+        path: release_assets/
 
     - name: Parse Version Tag
       id: vars
       run: |
         echo "Parsing version tag..."
         TAG=${GITHUB_REF/refs\/tags\//}
-        SEMVER_RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z\.-]*\)'
-        TAG_MAJOR=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\1#")
-        TAG_MINOR=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\2#")
-        TAG_PATCH=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\3#")
-        TAG_SPECIAL=$(echo ${TAG#v} | sed -e "s#$SEMVER_RE#\4#")
-        echo "tag_major=${TAG_MAJOR}" >> $GITHUB_ENV
-        echo "tag_minor=${TAG_MINOR}" >> $GITHUB_ENV
-        echo "tag_patch=${TAG_PATCH}" >> $GITHUB_ENV
-        echo "tag_special=${TAG_SPECIAL}" >> $GITHUB_ENV
+        SEMVER_RE='^\(v[0-9]\+\)\.\([0-9]\+\)\.\([0-9]\+\)\(.*\)'
+        if [[ "$TAG" =~ $SEMVER_RE ]]; then
+          TAG_MAJOR=${BASH_REMATCH[1]}
+          TAG_MINOR=${BASH_REMATCH[2]}
+          TAG_PATCH=${BASH_REMATCH[3]}
+          TAG_SPECIAL=${BASH_REMATCH[4]}
+          echo "tag_major=${TAG_MAJOR}" >> $GITHUB_ENV
+          echo "tag_minor=${TAG_MINOR}" >> $GITHUB_ENV
+          echo "tag_patch=${TAG_PATCH}" >> $GITHUB_ENV
+          echo "tag_special=${TAG_SPECIAL}" >> $GITHUB_ENV
+        else
+          echo "tag_major=v0" >> $GITHUB_ENV
+          echo "tag_minor=0" >> $GITHUB_ENV
+          echo "tag_patch=0" >> $GITHUB_ENV
+          echo "tag_special=" >> $GITHUB_ENV
+        fi
 
     - name: Prepare Release Assets
       run: |
-        mkdir -p release_assets
-        for dir in artifacts/*; do
-          if [ -d "$dir" ]; then
-            PLATFORM=$(basename "$dir")
-            cp "$dir"/* "release_assets/${PLATFORM}"
-          fi
-        done
+        mkdir -p release_assets_flat
+        find release_assets/ -type f -exec cp {} release_assets_flat/ \;
 
     - name: Upload to GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "release_assets/**"
+        artifacts: "release_assets_flat/*"
         tag: ${{ github.ref_name || 'v1.0.0' }}
         releaseName: "Release ${{ github.ref_name || 'v1.0.0' }}"
         body: |
