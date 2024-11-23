@@ -12,30 +12,19 @@ jobs:
     strategy:
       matrix:
         os: [linux, windows, darwin]
-        arch: [amd64,  arm64]
-        exclude:
-          - os: windows
-            arch: armv9
-
+        arch: [amd64, arm64]
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.20'
 
-    - name: Set up Git user
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
     - name: Cross-Compile
       env:
         GOOS: ${{ matrix.os }}
         GOARCH: ${{ matrix.arch }}
-        GOARM: ${{ matrix.arm_version || '' }}
       run: |
         echo "Building for $GOOS/$GOARCH"
         mkdir -p build/$GOOS-$GOARCH
